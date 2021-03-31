@@ -9,7 +9,7 @@ Hello internet. I am a lifelong polyglot Software Engineer residing on the east 
 - [Github](https://github.com/graves)
 - [Twitter](https://twitter.com/dqt)
 - [Website](https://graves.github.io)
-- [Résumé](https://drive.google.com/open?id=17dZnUCIKSPTPgez-NTPvlmXi79j_QCVQ)
+- [Résumé](https://docs.google.com/document/d/1m2mlJrqunwiSBJt2pEojFw0-YSC9JGoziW1uUEVOvL8/edit?usp=sharing)
 
 ### Posts
 

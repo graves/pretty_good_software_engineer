@@ -207,3 +207,101 @@ b build view canvas buildMorph extent: 1000@500; exportAsPNG.
 ![Florida COVID-19 transmission](https://i.imgur.com/6V1lpix.png)
 
 As you can see, this lays out our data in an easily digestable fashion. It shows the peak of the infections happening on **day 84** with **5,143,437 individuals infected**.
+
+Our model is in no way precise and leaves out many factors such as the effects of social distancing, state measures to slow the spread, population density, age, etc. Even so, the peak infected rate seems quite high at over 5 million individuals while at the time of writing (midnight April 24, 2020) there are only 30,839 [confirmed infected individuals in Florida.](https://floridahealthcovid19.gov/).
+
+Let's do a little investigating to see what the problem may be. We'll first change the Y-axis to our actual calendar date. The CDC [confirmed the first two COVID-19 cases in Florida](https://www.clickorlando.com/health/2020/03/02/gov-desantis-declares-health-emergency-after-2-presumptive-positive-coronavirus-cases-found/) on March 1, 2020 so we'll change our Y-axis to start on March 1. The linked article also announces 2 initial cases so we'll change our starting state so that it repressents 2 infected individuals.
+
+`state := #(21480000 2 0).`
+
+![Florida COVID-19 transmission infected](https://i.imgur.com/NY0aFUm.png)
+
+The graph interactions are, sadly, lost when I export the Roassal visualizations to an image or even the javascript representation but as you can see in the screenshot from my Pharo image the number of infected on today's date is **297,236** individuals. Why is it so high? It seems as though our model is off by about 267,000 people!
+
+We need to talk about testing. To date, the state of Florida has only tested 333,099 of it's 21.48 million inhabitants which is only 1.5 percent of it's population and, terrifyingly, of the 333,099 persons tested just over 9 percent tested positive for COVID-19. If we were to extrapolate that out to the total population then 1,988,663 people would currently test postive for the Corona virus. Extrapolating the ratio of infected to tested to the total population isn't going to give us an accurate estimation for a multitude of reasons but most notably because the 9% testing positive were presumably showing symptoms of the virus or are health care workers recently exposed to it. Nine percent of a total population seems quite high but [the CDC estimates that between 3-11% of the United States population are infected with the common flu each year](https://www.cdc.gov/flu/about/keyfacts.htm) and with the revalations that [carriers of the virus may remain asymptomatic](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7128959/) the **297,236** infected to date that our model shows might not be as far off as it seems.
+
+Let's run our model on another population, one in which testing is more widely available and reporting presumably more accurate, New York City. First we do a little refactoring, DRYing up the code a bit by referencing the `populationSize` variable from the `state` array and changing the population size to match that of New York City according to [Google](https://www.google.com/search?rlz=1C1CHBF_enUS880US880&sxsrf=ALeKk01k46J52vuE8Es82o5UG-vbUeWQAA%3A1588005306283&ei=ugmnXrTlEKWMgge4g7O4Bg&q=population+of+new+york+city&oq=population+of+new+york+city&gs_lcp=CgZwc3ktYWIQAzIECCMQJzICCAAyAggAMgIIADICCAAyAggAMgYIABAHEB4yAggAMgIIADICCAA6BAgAEEdQ9KpFWNW2RWCTuEVoAHACeAGAAbYCiAHxEJIBCDAuMTEuMS4xmAEAoAEBqgEHZ3dzLXdpeg&sclient=psy-ab&ved=0ahUKEwi0qrrhhInpAhUlhuAKHbjBDGcQ4dUDCAw&uact=5). The [first reported case of Corona virus in New York City](https://www.wsj.com/articles/first-case-of-coronavirus-confirmed-in-new-york-state-11583111692) was also March 1, 2020 so our X-axis remains unchanged.
+
+```smalltalk
+| dt durationOfRecovery gamma populationSize r0 beta solver state system values stepper susceptible infected recovered b ds1 ds2 ds3 |
+
+dt := 1.0.
+durationOfRecovery := 7.5.
+gamma := 1 / durationOfRecovery.
+populationSize := 8399000.
+r0 := 2.6.
+beta := r0 * gamma / populationSize.
+
+system := PMExplicitSystem block: [ :x :t| |c|
+     c := Array new: 3.
+     c at: 1 put: (beta negated) * (x at: 1) * (x at: 2).
+     c at: 2 put: (beta * (x at: 1) * (x at: 2)) - (gamma * (x at: 2)).
+     c at: 3 put: gamma * (x at: 2).
+     c
+     ].
+
+stepper := PMRungeKuttaStepper onSystem: system.
+solver := (PMExplicitSolver new) stepper: stepper; system: system; dt: dt.
+state := { populationSize . 1 . 0 }.
+values := (0.0 to: 180.0 by: dt) collect: [ :t| state := stepper doStep: state 
+                                                          time: t stepSize: dt ].
+
+susceptible := values collectWithIndex: [ :each :idx | Point x: idx y: (each at: 1) ].
+infected := values collectWithIndex: [ :each :idx | Point x: idx y: (each at: 2) ].
+recovered := values collectWithIndex: [ :each :idx | Point x: idx y: (each at: 3) ].
+
+b := RTGrapher new.
+
+ds1 := RTData new.
+ds1 label: 'Susceptible'.
+ds1 noDot.
+ds1 points: susceptible.
+ds1 connectColor: Color blue.
+ds1 y: [ :v | v y ].
+ds1 x: [ :v | v x ].
+ds1 interaction toggleDataset.
+ds1 interaction popup text: [ :v | ((v key y) asInteger) asString, ' susceptible on ', ('March 1, 2020' asDate  + v key x day) asDate asString].
+b add: ds1.
+
+ds2 := RTData new.
+ds2 label: 'Infected'.
+ds2 noDot.
+ds2 points: infected.
+ds2 connectColor: Color red.
+ds2 y: [ :v | v y ].
+ds2 x: [ :v | v x ].
+ds2 interaction toggleDataset.
+ds2 interaction popup text: [ :v | ((v key y) asInteger) asString, ' infected on ', ('March 1, 2020' asDate  + v key x day) asDate asString].
+b add: ds2.
+
+ds3 := RTData new.
+ds3 label: 'Recovered'.
+ds3 noDot.
+ds3 points: recovered.
+ds3 connectColor: Color green.
+ds3 y: [ :v | v y ].
+ds3 x: [ :v | v x ].
+ds3 interaction toggleDataset.
+ds3 interaction popup text: [ :v | ((v key y) asInteger) asString, ' recovered on  ', ('March 1, 2020' asDate  + v key x day) asDate asString].
+b add: ds3.
+
+b addDecorator: (RTCursorFollower new color: Color gray).
+b axisX
+        title: '';
+        labelRotation: -30;
+        labelConversion: [ :v | ('March 1, 2020' asDate  + v day) asDate ].
+b axisY title: 'Population'; noDecimal.
+b legend right.
+
+b build view canvas buildMorph extent: 1000@500; exportAsPNG.
+```
+
+![NYC COVID-19 transmission](https://i.imgur.com/YiHVSiH.png)
+
+To review the accuracy of our NYC model we first reference the number of [Corona virus cases in NYC](https://www1.nyc.gov/site/doh/covid/covid-19-data.page) as of *April, 26, 2020* which is **153,204**. When we remove the Suscepible and Recovered lines and check the Infected on April, 26 we see our NYC model is much closer to reality with **147,108** infected individuals.
+
+![NYC COVID-19 number of people infected](https://i.imgur.com/fzq2Wh2.png)
+
+Now seems like a good time to abstract our code into classes to make it easier for us to run models. A live screencast is a great way to show how we can and turn our scripts into a collection of objects working together to achieve our goals with the the added bonus of extending the package to fit more models. I'll consider recording a live screencast within the near future.
+
+In the meantime you can find the library I've already abstracted on Github at: [https://github.com/graves/2019-nCov](https://github.com/graves/2019-nCov)
